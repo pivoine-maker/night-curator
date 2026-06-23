@@ -9,3 +9,4 @@ build/
 night-curator-config.json
 .night-curator/
 automation/
+night_curator.egg-info/
