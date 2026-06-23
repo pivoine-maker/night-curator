@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.venv/
+.DS_Store
+.env
+night-curator-config.json
+.night-curator/
+automation/

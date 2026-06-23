@@ -1,0 +1,65 @@
+[
+  {
+    "museum": "Louvre Museum",
+    "city": "Paris",
+    "country": "France",
+    "artifact": "Winged Victory of Samothrace",
+    "next": "British Museum",
+    "nextArtifact": "Rosetta Stone",
+    "id": "louvre-museum"
+  },
+  {
+    "museum": "British Museum",
+    "city": "London",
+    "country": "United Kingdom",
+    "artifact": "Rosetta Stone",
+    "next": "Palace Museum",
+    "nextArtifact": "Nine Dragon motifs",
+    "id": "british-museum"
+  },
+  {
+    "museum": "Palace Museum",
+    "city": "Beijing",
+    "country": "China",
+    "artifact": "Nine Dragon motifs",
+    "next": "The Metropolitan Museum of Art",
+    "nextArtifact": "Temple of Dendur",
+    "id": "palace-museum"
+  },
+  {
+    "museum": "The Metropolitan Museum of Art",
+    "city": "New York",
+    "country": "United States",
+    "artifact": "Temple of Dendur",
+    "next": "Grand Egyptian Museum",
+    "nextArtifact": "Tutankhamun treasures",
+    "id": "metropolitan-museum-of-art"
+  },
+  {
+    "museum": "Grand Egyptian Museum",
+    "city": "Giza",
+    "country": "Egypt",
+    "artifact": "Tutankhamun treasures",
+    "next": "Vatican Museums",
+    "nextArtifact": "Gallery of Maps",
+    "id": "grand-egyptian-museum"
+  },
+  {
+    "museum": "Vatican Museums",
+    "city": "Vatican City",
+    "country": "Vatican City",
+    "artifact": "Gallery of Maps",
+    "next": "Uffizi Gallery",
+    "nextArtifact": "Primavera",
+    "id": "vatican-museums"
+  },
+  {
+    "museum": "Uffizi Gallery",
+    "city": "Florence",
+    "country": "Italy",
+    "artifact": "Primavera",
+    "next": "Rijksmuseum",
+    "nextArtifact": "The Night Watch",
+    "id": "uffizi-gallery"
+  }
+]
