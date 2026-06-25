@@ -1,6 +1,17 @@
 # The Night Curator
 
-The Night Curator is a nightly museum-adventure generator powered by the Codex CLI. It chooses a museum, asks Codex to write a 9-panel educational story/quiz, asks Codex to create a cinematic 3×3 comic image, builds an interactive HTML page, and can optionally send the result through a Lark/Feishu bot.
+The Night Curator is a **daily scheduled museum night-adventure generator** powered by the Codex CLI. Every night it picks a world-class museum, turns the visit into a playful night-at-the-museum quest, teaches real cultural and historical knowledge along the way, and packages the result as an interactive story, quiz, comic image, and shareable HTML page.
+
+Instead of producing a static museum note, Night Curator designs a small learning journey: a 9-panel adventure, checkpoint-style questions, answer explanations, a cinematic 3x3 comic, and an HTML experience that can be saved locally or delivered through Lark/Feishu. The fun part is the structure: discovery first, knowledge second, then quiz-based progression so each daily run feels like a tiny guided expedition.
+
+Highlights:
+
+- **Daily scheduled exploration**: install the scheduler once and wake up to a new museum quest every day.
+- **World-famous museum rotation**: each run selects a museum stop and builds the story around its collection, setting, and educational angle.
+- **Adventure + knowledge + quiz loop**: the generated experience mixes narrative exploration, concise explanations, and answerable checkpoints.
+- **Visual storytelling**: Codex creates both the 9-panel content plan and a cinematic 3x3 comic image for the day's journey.
+- **Shareable output**: each run writes local artifacts and can optionally send the Markdown summary, comic, and HTML through Lark/Feishu.
+- **CLI-native design**: users only log in to `codex`; there is no separate text-model or image-model provider setup.
 
 Users do **not** configure separate text or image model providers. Install and log in to `codex`; Night Curator delegates creation to the model configured in your Codex CLI.
 
