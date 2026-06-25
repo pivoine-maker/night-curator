@@ -4,6 +4,10 @@ The Night Curator is a nightly museum-adventure generator powered by the Codex C
 
 Users do **not** configure separate text or image model providers. Install and log in to `codex`; Night Curator delegates creation to the model configured in your Codex CLI.
 
+## Demo
+
+View the public HTML demo: https://pivoine-maker.github.io/night-curator/
+
 ## Quick Start
 
 ```bash
