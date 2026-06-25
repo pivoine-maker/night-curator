@@ -3,15 +3,19 @@ import argparse, base64, hashlib, json, os, random, subprocess, sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 try:
+    from .config import default_state_dir, load_config, provider_api_key, provider_header_key
+except ImportError:
+    from config import default_state_dir, load_config, provider_api_key, provider_header_key
+try:
     from openai import OpenAI
 except ImportError:
     OpenAI = None
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-STATE_DIR = Path(os.environ.get('NIGHT_CURATOR_HOME', Path(__file__).resolve().parent / '.night-curator'))
+STATE_DIR = default_state_dir()
 RUNS = STATE_DIR / 'runs'
 MUSEUMS = json.loads((PACKAGE_DIR / 'museums.json').read_text())
-MUSEUM_IDEAS = [
+FALLBACK_MUSEUM_IDEAS = [
     {'museum':'Louvre Museum','city':'Paris','country':'France','artifact':'Winged Victory of Samothrace','next':'tomorrow’s museum','nextArtifact':'a new clue'},
     {'museum':'British Museum','city':'London','country':'United Kingdom','artifact':'Rosetta Stone','next':'tomorrow’s museum','nextArtifact':'a new clue'},
     {'museum':'Palace Museum','city':'Beijing','country':'China','artifact':'Nine Dragon motifs','next':'tomorrow’s museum','nextArtifact':'a new clue'},
@@ -25,23 +29,36 @@ MUSEUM_IDEAS = [
     {'museum':'Pergamon Museum','city':'Berlin','country':'Germany','artifact':'Ishtar Gate','next':'tomorrow’s museum','nextArtifact':'a new clue'},
     {'museum':'National Museum of Korea','city':'Seoul','country':'South Korea','artifact':'Goryeo celadon','next':'tomorrow’s museum','nextArtifact':'a new clue'},
 ]
-PROJECT_CONFIG_PATH = STATE_DIR / 'night-curator-config.json'
+
+def load_museum_catalog():
+    catalog_path = PACKAGE_DIR / 'museum_catalog.json'
+    if not catalog_path.exists():
+        return FALLBACK_MUSEUM_IDEAS
+    try:
+        catalog = json.loads(catalog_path.read_text())
+    except json.JSONDecodeError:
+        return FALLBACK_MUSEUM_IDEAS
+    required = {'museum', 'city', 'country', 'artifact'}
+    usable = [item for item in catalog if required <= set(item) and all(item[key] for key in required)]
+    return usable or FALLBACK_MUSEUM_IDEAS
+
+MUSEUM_IDEAS = load_museum_catalog()
 ASSETS = STATE_DIR / 'assets'
-OPEN_ID = os.environ.get('NIGHT_CURATOR_LARK_OPEN_ID', '')
-AIDP_API_KEY = os.environ.get('AIDP_IMAGE_API_KEY') or os.environ.get('BYTEDANCE_GPT_MIDDLEWARE_API_KEY') or os.environ.get('OPENAI_API_KEY') or ''
-AIDP_HEADER_KEY = os.environ.get('AIDP_IMAGE_HEADER_KEY', '')
-IMAGE_BASE_URL = 'https://aidp.bytedance.net/api/modelhub/online/v2/crawl/openai'
-TEXT_BASE_URL = os.environ.get('NIGHT_CURATOR_TEXT_BASE_URL', 'http://127.0.0.1:4002/v1')
 TZ = timezone(timedelta(hours=8))
 
+def project_config_path():
+    return default_state_dir() / 'night-curator-config.json'
+
 def load_project_config():
-    if PROJECT_CONFIG_PATH.exists():
-        return json.loads(PROJECT_CONFIG_PATH.read_text())
-    return {}
+    return load_config(project_config_path())
 
 def configured_open_id():
     config = load_project_config()
-    return os.environ.get('NIGHT_CURATOR_LARK_OPEN_ID') or config.get('lark', {}).get('open_id') or OPEN_ID
+    return os.environ.get('NIGHT_CURATOR_LARK_OPEN_ID') or config.get('lark', {}).get('open_id') or ''
+
+def provider_headers(provider):
+    header_key = provider_header_key(provider)
+    return {'api-key': header_key} if header_key else None
 
 def run(cmd, cwd=None):
     return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=False)
@@ -64,7 +81,11 @@ def choose_museum(run_date=None):
 def llm_json(day, item):
     if OpenAI is None:
         raise RuntimeError('The openai package is required for live text generation. Use --dry-run or install openai.')
-    client = OpenAI(api_key=os.environ.get('NIGHT_CURATOR_TEXT_API_KEY', 'dummy'), base_url=TEXT_BASE_URL)
+    text_config = load_project_config().get('text', {})
+    api_key = provider_api_key(text_config)
+    if not api_key:
+        raise RuntimeError(f"Missing text API key. Set {text_config.get('api_key_env', 'OPENAI_API_KEY')}.")
+    client = OpenAI(api_key=api_key, base_url=text_config.get('base_url'))
     prompt = f'''
 You are The Night Curator, an educational museum adventure agent.
 Create today's interactive 3x3 museum adventure content in Chinese.
@@ -79,10 +100,10 @@ Return strict JSON only with this shape:
 Need exactly 9 panels. Correct answer index must vary across panels. Questions must require reasoning from the knowledge, not direct lookup. Include real historical/cultural knowledge and avoid hallucinated precise facts when uncertain.
 '''.strip()
     resp = client.chat.completions.create(
-        model=os.environ.get('NIGHT_CURATOR_TEXT_MODEL', 'bytedance-gpt-5.4'),
+        model=text_config.get('model'),
         messages=[{'role':'user','content':prompt}],
         temperature=0.8,
-        extra_headers={'api-key': AIDP_HEADER_KEY},
+        extra_headers=provider_headers(text_config),
     )
     text = resp.choices[0].message.content.strip()
     if text.startswith('```'):
@@ -104,21 +125,19 @@ def generate_image(day, item, content, out_dir):
         raise RuntimeError('The openai package is required for live image generation. Use --dry-run/--no-send or install openai.')
     config = load_project_config()
     image_config = config.get('image', {})
-    api_key_env = image_config.get('api_key_env', 'AIDP_IMAGE_API_KEY')
-    api_key = os.environ.get(api_key_env)
+    api_key_env = image_config.get('api_key_env', 'OPENAI_API_KEY')
+    api_key = provider_api_key(image_config)
     if not api_key:
         raise RuntimeError(f'Missing image API key. Set {api_key_env}.')
-    base_url = image_config.get('base_url') or IMAGE_BASE_URL
+    base_url = image_config.get('base_url')
     model = image_config.get('model') or 'gpt-image-2'
-    header_key_env = image_config.get('header_key_env', 'AIDP_IMAGE_HEADER_KEY')
-    header_key = os.environ.get(header_key_env, AIDP_HEADER_KEY)
     client = OpenAI(api_key=api_key, base_url=base_url)
     agent = config.get('agent', {})
     agent_description = agent.get('description', 'small nimble non-human AI agent explorer with satchel and tiny glowing eyes')
     anchor_path = ASSETS / agent.get('anchor_image', 'agent-anchor.png')
     anchor_hint = f' Use the established agent anchor image as identity reference: {anchor_path}.' if anchor_path.exists() else ''
     prompt = f"""Create one square 3x3 nine-panel comic page for The Night Curator. Museum: {item['museum']} in {item['city']}. Featured artifact/theme: {item['artifact']}. Style: dark cinematic graphic novel, midnight museum adventure, dramatic chiaroscuro, deep navy shadows, antique gold highlights, film grain, inked panel lines. Format: one square image, clear 3 by 3 comic grid, nine distinct panels, thin black gutters. No readable text, no speech bubbles, no logos, no watermark. Recurring character: {agent_description}.{anchor_hint}"""
-    result = client.images.generate(model=model, prompt=prompt, size='1024x1024', quality='medium', extra_headers={'api-key': header_key})
+    result = client.images.generate(model=model, prompt=prompt, size=image_config.get('size', '1024x1024'), quality=image_config.get('quality', 'medium'), extra_headers=provider_headers(image_config))
     item0 = result.data[0]
     out = out_dir / 'comic.png'
     if getattr(item0, 'b64_json', None):

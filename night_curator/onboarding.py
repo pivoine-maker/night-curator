@@ -1,28 +1,31 @@
 #!/usr/bin/env python3
 import argparse, base64, hashlib, json, os, random
 from pathlib import Path
-from openai import OpenAI
+try:
+    from .config import DEFAULT_IMAGE, provider_api_key, provider_header_key, save_config
+except ImportError:
+    from config import DEFAULT_IMAGE, provider_api_key, provider_header_key, save_config
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
-DEFAULT_BASE_URL = 'https://aidp.bytedance.net/api/modelhub/online/v2/crawl/openai'
-DEFAULT_MODEL = 'gpt-image-2'
-DEFAULT_HEADER_KEY_ENV = 'AIDP_IMAGE_HEADER_KEY'
-DEFAULT_API_KEY_ENV = 'AIDP_IMAGE_API_KEY'
+DEFAULT_BASE_URL = DEFAULT_IMAGE['base_url']
+DEFAULT_MODEL = DEFAULT_IMAGE['model']
+DEFAULT_HEADER_KEY_ENV = DEFAULT_IMAGE['header_key_env']
+DEFAULT_API_KEY_ENV = DEFAULT_IMAGE['api_key_env']
 DEFAULT_HEADER_KEY = ''
 PACKAGE_DIR = Path(__file__).resolve().parent
 STATE_DIR = Path(os.environ.get('NIGHT_CURATOR_HOME', Path.home() / '.night-curator'))
 
 
 def save_project_config(config_path, *, image_api_key_env, image_model, image_base_url, first_stop_id, agent_description, reference_images=None, image_header_key_env=DEFAULT_HEADER_KEY_ENV, lark_open_id=''):
-    config_path = Path(config_path)
-    config_path.parent.mkdir(parents=True, exist_ok=True)
     data = {
         'image': {'api_key_env': image_api_key_env, 'header_key_env': image_header_key_env, 'model': image_model, 'base_url': image_base_url},
-        'journey': {'first_stop_id': first_stop_id},
-        'agent': {'description': agent_description, 'reference_images': reference_images or [], 'anchor_image': 'agent-anchor.png'},
-        'lark': {'open_id': lark_open_id},
+        'agent': {'description': agent_description, 'reference_images': reference_images or [], 'anchor_image': 'agent-anchor.png', 'first_stop_id': first_stop_id},
+        'lark': {'enabled': bool(lark_open_id), 'open_id': lark_open_id},
     }
-    config_path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
-    return data
+    return save_config(config_path, data)
 
 
 def choose_first_stop(museums, requested, seed=None):
@@ -59,13 +62,17 @@ def _write_image_from_result(result, out_path):
 
 
 def generate_anchor_image(config, output_dir):
+    if OpenAI is None:
+        raise RuntimeError('The openai package is required to generate the anchor image. Re-run setup with --skip-anchor or install openai.')
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    api_key = os.environ.get(config['image']['api_key_env']) or os.environ.get('BYTEDANCE_GPT_MIDDLEWARE_API_KEY') or os.environ.get('OPENAI_API_KEY') or 'dummy'
-    header_key = os.environ.get(config['image'].get('header_key_env', DEFAULT_HEADER_KEY_ENV), DEFAULT_HEADER_KEY)
+    api_key = provider_api_key(config['image'])
+    if not api_key:
+        raise RuntimeError(f"Missing image API key. Set {config['image'].get('api_key_env', 'OPENAI_API_KEY')}.")
+    header_key = provider_header_key(config['image'])
     client = OpenAI(api_key=api_key, base_url=config['image']['base_url'])
     prompt = build_anchor_prompt(config['agent']['description'], bool(config['agent'].get('reference_images')))
-    kwargs = {'model': config['image']['model'], 'prompt': prompt, 'size': '1024x1024', 'quality': 'medium', 'extra_headers': {'api-key': header_key}}
+    kwargs = {'model': config['image']['model'], 'prompt': prompt, 'size': config['image'].get('size', '1024x1024'), 'quality': config['image'].get('quality', 'medium'), 'extra_headers': {'api-key': header_key} if header_key else None}
     result = client.images.generate(**kwargs)
     out = output_dir / config['agent'].get('anchor_image', 'agent-anchor.png')
     _write_image_from_result(result, out)

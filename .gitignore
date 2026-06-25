@@ -6,7 +6,11 @@ build/
 .venv/
 .DS_Store
 .env
+.env.*
+!.env.example
 night-curator-config.json
 .night-curator/
 automation/
 night_curator.egg-info/
+.coverage
+.pytest_cache/

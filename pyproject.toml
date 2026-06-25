@@ -16,9 +16,10 @@ dependencies = ["openai>=1.0.0"]
 night-curator-setup = "night_curator.setup:main"
 night-curator-daily = "night_curator.daily:main"
 night-curator-onboarding = "night_curator.onboarding:main"
+night-curator-schedule = "night_curator.schedule:main"
 
 [tool.setuptools]
 packages = ["night_curator"]
 
 [tool.setuptools.package-data]
-night_curator = ["museums.json", "vintage-template.html"]
+night_curator = ["museums.json", "museum_catalog.json", "vintage-template.html", "codex-automation-prompt.md", "README.md"]
