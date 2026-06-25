@@ -10,6 +10,8 @@ View the public HTML demo: https://pivoine-maker.github.io/night-curator/
 
 ## Quick Start
 
+Night Curator is designed to run as a **daily scheduled task**. Start with one manual run to verify your Codex and optional Lark/Feishu setup, then install the scheduler so it can generate a new museum adventure automatically every night.
+
 ```bash
 git clone https://github.com/pivoine-maker/night-curator.git
 cd night-curator
@@ -20,6 +22,13 @@ night-curator-daily --no-send --summary-json
 ```
 
 Generated files are written to `~/.night-curator/runs/YYYY-MM-DD/`.
+
+After the manual run succeeds, enable the daily scheduled task on macOS:
+
+```bash
+night-curator-schedule install-launchd --hour 0 --minute 0
+night-curator-schedule status
+```
 
 ## Requirements
 
@@ -67,9 +76,9 @@ night-curator-daily
 
 Use `--no-send` to generate files without sending.
 
-## macOS launchd Schedule
+## Daily Scheduled Task with macOS launchd
 
-Install a daily 00:00 Asia/Shanghai task:
+Install a daily 00:00 Asia/Shanghai scheduled task:
 
 ```bash
 night-curator-schedule install-launchd --hour 0 --minute 0
@@ -84,7 +93,7 @@ night-curator-schedule uninstall-launchd
 
 Logs are written under `~/.night-curator/logs/`.
 
-## Cross-Platform Scheduling
+## Cross-Platform Scheduled Task Examples
 
 Cron example:
 
