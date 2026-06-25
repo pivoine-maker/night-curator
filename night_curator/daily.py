@@ -4,10 +4,10 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 try:
     from .config import default_state_dir, load_config
-    from .codex_runner import generate_content_with_codex, generate_image_with_codex
+    from .codex_runner import generate_content, generate_image
 except ImportError:
     from config import default_state_dir, load_config
-    from codex_runner import generate_content_with_codex, generate_image_with_codex
+    from codex_runner import generate_content, generate_image
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 STATE_DIR = default_state_dir()
@@ -159,7 +159,7 @@ def main(argv=None):
         if args.content_json:
             content = load_content_json(args.content_json)
         else:
-            content = fallback_content(day, item) if force_fallback or args.dry_run else generate_content_with_codex(item, out_dir, load_project_config())
+            content = fallback_content(day, item) if force_fallback or args.dry_run else generate_content(item, out_dir, load_project_config())
     except Exception as e:
         if args.content_json:
             raise
@@ -172,8 +172,8 @@ def main(argv=None):
     if args.dry_run or force_fallback:
         image_path.write_bytes(b'')
     else:
-        image_path = generate_image_with_codex(item, content, out_dir, load_project_config())
-        image_source = 'codex_cli'
+        image_path = generate_image(item, content, out_dir, load_project_config())
+        image_source = 'model_api'
     html_path = write_html(content, out_dir, day, item)
     sent = False
     if not args.no_send:

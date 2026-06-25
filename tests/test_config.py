@@ -46,14 +46,24 @@ class ConfigTests(unittest.TestCase):
             self.assertNotIn("sk-secret", raw)
             self.assertNotIn("secret-token", raw)
 
-    def test_default_config_has_no_model_provider_settings(self):
+    def test_default_config_has_model_api_settings(self):
         config = default_config()
-        self.assertIn("codex", config)
-        self.assertNotIn("text", config)
-        self.assertNotIn("image", config)
+        self.assertIn("models", config)
+        self.assertEqual(config["models"]["text"]["base_url"], "https://api.openai.com/v1")
+        self.assertEqual(config["models"]["image"]["endpoint"], "responses")
         rendered = json.dumps(config)
+        self.assertIn("api_key_env", rendered)
         self.assertNotIn("bytedance", rendered.lower())
-        self.assertNotIn("api.openai.com", rendered.lower())
+        self.assertNotIn("sk-", rendered.lower())
+
+    def test_load_config_keeps_legacy_codex_but_adds_models(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.json"
+            path.write_text(json.dumps({"codex": {"profile": "night"}, "models": {"text": {"model": "gpt-x"}}}))
+            config = load_config(path)
+            self.assertEqual(config["codex"]["profile"], "night")
+            self.assertEqual(config["models"]["text"]["model"], "gpt-x")
+            self.assertEqual(config["models"]["image"]["model"], "gpt-image-1")
 
 
 if __name__ == "__main__":

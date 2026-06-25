@@ -9,6 +9,22 @@ DEFAULT_CODEX = {
     "model": "",
 }
 
+DEFAULT_MODELS = {
+    "text": {
+        "base_url": "https://api.openai.com/v1",
+        "api_key_env": "OPENAI_API_KEY",
+        "model": "gpt-4.1-mini",
+        "temperature": 0.7,
+    },
+    "image": {
+        "base_url": "https://api.openai.com/v1",
+        "api_key_env": "OPENAI_API_KEY",
+        "model": "gpt-image-1",
+        "size": "1024x1024",
+        "endpoint": "responses",
+    },
+}
+
 DEFAULT_AGENT = {
     "description": "a tiny brass owl-like AI curator with moon-white glowing eyes, velvet cape, antique gold satchel, and a moon-key badge",
     "first_stop_id": "",
@@ -31,6 +47,7 @@ def default_state_dir():
 def default_config():
     return {
         "codex": copy.deepcopy(DEFAULT_CODEX),
+        "models": copy.deepcopy(DEFAULT_MODELS),
         "agent": copy.deepcopy(DEFAULT_AGENT),
         "lark": copy.deepcopy(DEFAULT_LARK),
     }
@@ -39,8 +56,6 @@ def default_config():
 def deep_merge(base, override):
     merged = copy.deepcopy(base)
     for key, value in (override or {}).items():
-        if key in {"text", "image"}:
-            continue
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = deep_merge(merged[key], value)
         else:

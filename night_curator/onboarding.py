@@ -54,7 +54,7 @@ def load_museums(path):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description='Configure The Night Curator for Codex CLI generation.')
+    parser = argparse.ArgumentParser(description='Configure The Night Curator museum onboarding.')
     parser.add_argument('--config', default=str(STATE_DIR / 'night-curator-config.json'))
     parser.add_argument('--museums', default=str(PACKAGE_DIR / 'museums.json'))
     parser.add_argument('--codex-bin', default=DEFAULT_CODEX['bin'])

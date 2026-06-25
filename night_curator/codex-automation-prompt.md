@@ -1,16 +1,19 @@
-# Codex Automation Prompt
+# Night Curator Automation Prompt
 
-Schedule this as a standalone Codex Automation that runs every day at 00:00 Asia/Shanghai.
+Schedule this as a standalone automation that runs every day at 00:00 Asia/Shanghai.
 
-Working directory: `{{PROJECT_DIR}}`
-State directory: `{{STATE_DIR}}`
+Project directory:
 
-Run this command:
+```bash
+{{PROJECT_DIR}}
+```
+
+Daily command:
 
 ```bash
 {{DAILY_COMMAND}}
 ```
 
-Night Curator itself will invoke `codex exec` to create the JSON content and comic image. After the command finishes, report the generated title, museum, output directory, HTML path, image path, and delivery status.
+Night Curator invokes configured text and image model APIs to create the JSON content and comic image. Ensure the scheduler environment includes the API key variables referenced by `{{STATE_DIR}}/night-curator-config.json`. After the command finishes, report the generated title, museum, output directory, HTML path, image path, and delivery status.
 
-If the command fails, report the exact failing step and stderr/stdout excerpt. Ask the user for input only when Codex CLI authentication, filesystem permissions, missing dependencies, or optional Lark credentials are required.
+If the command fails, report the exact failing step and stderr/stdout excerpt. Ask the user for input only when model API credentials, filesystem permissions, missing dependencies, or optional Lark credentials are required.

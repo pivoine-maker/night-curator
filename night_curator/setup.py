@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 try:
-    from .config import DEFAULT_AGENT, DEFAULT_CODEX, default_state_dir, save_config
+    from .config import DEFAULT_AGENT, DEFAULT_CODEX, DEFAULT_MODELS, default_state_dir, save_config
     from .onboarding import choose_first_stop, load_museums
 except ImportError:
-    from config import DEFAULT_AGENT, DEFAULT_CODEX, default_state_dir, save_config
+    from config import DEFAULT_AGENT, DEFAULT_CODEX, DEFAULT_MODELS, default_state_dir, save_config
     from onboarding import choose_first_stop, load_museums
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -47,6 +48,14 @@ def parse_args(argv=None):
     parser.add_argument("--codex-bin", default=DEFAULT_CODEX["bin"])
     parser.add_argument("--codex-profile", default=DEFAULT_CODEX["profile"])
     parser.add_argument("--codex-model", default=DEFAULT_CODEX["model"])
+    parser.add_argument("--text-base-url", default=DEFAULT_MODELS["text"]["base_url"])
+    parser.add_argument("--text-api-key-env", default=DEFAULT_MODELS["text"]["api_key_env"])
+    parser.add_argument("--text-model", default=DEFAULT_MODELS["text"]["model"])
+    parser.add_argument("--image-base-url", default=DEFAULT_MODELS["image"]["base_url"])
+    parser.add_argument("--image-api-key-env", default=DEFAULT_MODELS["image"]["api_key_env"])
+    parser.add_argument("--image-model", default=DEFAULT_MODELS["image"]["model"])
+    parser.add_argument("--image-size", default=DEFAULT_MODELS["image"]["size"])
+    parser.add_argument("--image-endpoint", choices=["responses", "images"], default=DEFAULT_MODELS["image"]["endpoint"])
     parser.add_argument("--first-stop", default="surprise me")
     parser.add_argument("--agent-description", default=DEFAULT_AGENT["description"])
     parser.add_argument("--reference-image", action="append", default=[])
@@ -60,9 +69,13 @@ def parse_args(argv=None):
 
 def apply_interactive(args):
     print("✦ The Night Curator setup ✦")
-    args.codex_bin = ask("Codex CLI command", args.codex_bin)
-    args.codex_profile = ask("Codex profile (optional)", args.codex_profile)
-    args.codex_model = ask("Codex model override (optional)", args.codex_model)
+    args.text_base_url = ask("Text model API base URL", args.text_base_url)
+    args.text_api_key_env = ask("Text model API key env var", args.text_api_key_env)
+    args.text_model = ask("Text model", args.text_model)
+    args.image_base_url = ask("Image model API base URL", args.image_base_url)
+    args.image_api_key_env = ask("Image model API key env var", args.image_api_key_env)
+    args.image_model = ask("Image model", args.image_model)
+    args.image_size = ask("Image size", args.image_size)
     args.first_stop = ask("First museum stop id/name", args.first_stop)
     args.agent_description = ask("Agent description", args.agent_description)
     use_lark = ask("Enable Lark/Feishu delivery? yes/no", "no").lower() in {"y", "yes"}
@@ -77,6 +90,10 @@ def apply_interactive(args):
 def config_from_args(args, first_stop):
     return {
         "codex": {"bin": args.codex_bin, "profile": args.codex_profile, "model": args.codex_model},
+        "models": {
+            "text": {"base_url": args.text_base_url, "api_key_env": args.text_api_key_env, "model": args.text_model, "temperature": DEFAULT_MODELS["text"]["temperature"]},
+            "image": {"base_url": args.image_base_url, "api_key_env": args.image_api_key_env, "model": args.image_model, "size": args.image_size, "endpoint": args.image_endpoint},
+        },
         "agent": {"first_stop_id": first_stop["id"], "description": args.agent_description, "reference_images": args.reference_image, "anchor_image": DEFAULT_AGENT["anchor_image"]},
         "lark": {"enabled": bool(args.enable_lark), "open_id": args.lark_open_id if args.enable_lark else ""},
     }

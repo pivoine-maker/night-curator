@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "night-curator"
 version = "0.1.0"
-description = "A nightly museum adventure agent powered by Codex CLI that generates cinematic educational comics and optionally pushes them to Lark/Feishu."
+description = "A nightly museum adventure agent powered by configurable text and image model APIs that generates cinematic educational comics and optionally pushes them to Lark/Feishu."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
