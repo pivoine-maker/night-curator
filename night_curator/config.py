@@ -3,20 +3,10 @@ import json
 import os
 from pathlib import Path
 
-DEFAULT_TEXT = {
-    "base_url": "https://api.openai.com/v1",
-    "model": "gpt-4.1-mini",
-    "api_key_env": "OPENAI_API_KEY",
-    "header_key_env": "",
-}
-
-DEFAULT_IMAGE = {
-    "base_url": "https://api.openai.com/v1",
-    "model": "gpt-image-1",
-    "api_key_env": "OPENAI_API_KEY",
-    "header_key_env": "",
-    "size": "1024x1024",
-    "quality": "medium",
+DEFAULT_CODEX = {
+    "bin": "codex",
+    "profile": "",
+    "model": "",
 }
 
 DEFAULT_AGENT = {
@@ -40,8 +30,7 @@ def default_state_dir():
 
 def default_config():
     return {
-        "text": copy.deepcopy(DEFAULT_TEXT),
-        "image": copy.deepcopy(DEFAULT_IMAGE),
+        "codex": copy.deepcopy(DEFAULT_CODEX),
         "agent": copy.deepcopy(DEFAULT_AGENT),
         "lark": copy.deepcopy(DEFAULT_LARK),
     }
@@ -50,6 +39,8 @@ def default_config():
 def deep_merge(base, override):
     merged = copy.deepcopy(base)
     for key, value in (override or {}).items():
+        if key in {"text", "image"}:
+            continue
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
             merged[key] = deep_merge(merged[key], value)
         else:
@@ -78,13 +69,3 @@ def save_config(path, config):
     safe = deep_merge(default_config(), scrub_secrets(config))
     config_path.write_text(json.dumps(safe, ensure_ascii=False, indent=2) + "\n")
     return safe
-
-
-def provider_api_key(provider):
-    env_name = (provider or {}).get("api_key_env") or ""
-    return os.environ.get(env_name, "") if env_name else ""
-
-
-def provider_header_key(provider):
-    env_name = (provider or {}).get("header_key_env") or ""
-    return os.environ.get(env_name, "") if env_name else ""

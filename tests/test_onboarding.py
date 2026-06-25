@@ -12,17 +12,19 @@ class OnboardingTests(unittest.TestCase):
             config_path = Path(tmp) / "config.json"
             save_project_config(
                 config_path,
-                image_api_key_env="OPENAI_API_KEY",
-                image_model="gpt-image-1",
-                image_base_url="https://example.test/v1",
                 first_stop_id="british-museum",
                 agent_description="a tiny brass curator robot with moonlit eyes",
                 reference_images=["refs/agent.png"],
+                codex_bin="codex",
+                codex_profile="night",
+                codex_model="gpt-test",
             )
             data = json.loads(config_path.read_text())
-            self.assertEqual(data["image"]["api_key_env"], "OPENAI_API_KEY")
-            self.assertEqual(data["image"]["model"], "gpt-image-1")
-            self.assertEqual(data["image"]["base_url"], "https://example.test/v1")
+            self.assertEqual(data["codex"]["bin"], "codex")
+            self.assertEqual(data["codex"]["profile"], "night")
+            self.assertEqual(data["codex"]["model"], "gpt-test")
+            self.assertNotIn("image", data)
+            self.assertNotIn("text", data)
             self.assertEqual(data["agent"]["first_stop_id"], "british-museum")
             self.assertEqual(data["agent"]["description"], "a tiny brass curator robot with moonlit eyes")
             self.assertEqual(data["agent"]["reference_images"], ["refs/agent.png"])

@@ -1,14 +1,8 @@
 # The Night Curator
 
-The Night Curator is a nightly museum-adventure generator. It chooses a museum, writes a 9-panel educational story/quiz, generates a cinematic 3×3 comic image, builds an interactive HTML page, and can optionally send the result through a Lark/Feishu bot.
+The Night Curator is a nightly museum-adventure generator powered by the Codex CLI. It chooses a museum, asks Codex to write a 9-panel educational story/quiz, asks Codex to create a cinematic 3×3 comic image, builds an interactive HTML page, and can optionally send the result through a Lark/Feishu bot.
 
-It is designed for open-source use:
-
-- text generation uses an OpenAI-compatible chat endpoint;
-- image generation uses an OpenAI-compatible image endpoint;
-- secrets stay in environment variables, not config files;
-- output works locally even without Lark/Feishu;
-- scheduling supports macOS `launchd`, plus cron/systemd/Windows/GitHub Actions examples.
+Users do **not** configure separate text or image model providers. Install and log in to `codex`; Night Curator delegates creation to the model configured in your Codex CLI.
 
 ## Quick Start
 
@@ -16,47 +10,48 @@ It is designed for open-source use:
 git clone https://github.com/pivoine-maker/night-curator.git
 cd night-curator
 python3 -m pip install -e .
-export OPENAI_API_KEY="your-api-key"
-night-curator-setup --skip-anchor --skip-dry-run
-night-curator-daily --dry-run --no-send --summary-json
+codex login
+night-curator-setup --skip-dry-run
+night-curator-daily --no-send --summary-json
 ```
 
 Generated files are written to `~/.night-curator/runs/YYYY-MM-DD/`.
 
-## Configure Models
+## Requirements
 
-The setup command writes `~/.night-curator/night-curator-config.json`. The file stores environment variable names, model names, and base URLs. It never needs raw API keys.
+- Python 3.10+
+- Codex CLI installed and authenticated
+- A Codex model/session capable of writing files and generating images
+- Optional: `lark-cli` if you want Lark/Feishu delivery
+
+## Configure Codex CLI
+
+By default Night Curator runs:
 
 ```bash
-export OPENAI_API_KEY="your-api-key"
+codex exec --sandbox workspace-write --ask-for-approval never ...
+```
+
+You can override the Codex command, profile, or model name without configuring API keys:
+
+```bash
 night-curator-setup \
-  --text-api-key-env OPENAI_API_KEY \
-  --text-base-url https://api.openai.com/v1 \
-  --text-model gpt-4.1-mini \
-  --image-api-key-env OPENAI_API_KEY \
-  --image-base-url https://api.openai.com/v1 \
-  --image-model gpt-image-1 \
-  --skip-anchor \
+  --codex-bin codex \
+  --codex-profile default \
+  --codex-model "" \
   --skip-dry-run
 ```
 
-If your provider requires an additional `api-key` header, set `--text-header-key-env` or `--image-header-key-env` to the environment variable that contains that header value.
+The config file at `~/.night-curator/night-curator-config.json` stores only Codex CLI preferences, agent description, and optional Lark target.
 
 ## Lark/Feishu Delivery
 
 Lark/Feishu is optional. Without it, Night Curator only writes local files.
 
-To enable delivery:
-
-1. Install and authenticate `lark-cli` for a Lark/Feishu app bot.
-2. Confirm bot sending works with your app.
-3. Configure Night Curator with your recipient `open_id`:
-
 ```bash
 night-curator-setup \
   --enable-lark \
   --lark-open-id ou_xxx \
-  --skip-anchor \
   --skip-dry-run
 ```
 
@@ -108,37 +103,30 @@ Windows Task Scheduler action:
 python -m night_curator.daily
 ```
 
-GitHub Actions can run the same command on a schedule, but you must provide model and Lark credentials as repository secrets.
+GitHub Actions can run the same command on a schedule if the runner has an authenticated Codex CLI and any optional Lark credentials.
 
-## Codex Automation Mode
+## How Generation Works
 
-If you want Codex to write the daily text content, print the automation prompt:
-
-```bash
-night-curator-setup --print-automation-prompt
-```
-
-Codex should write `~/.night-curator/codex-content/today.json`, then run:
-
-```bash
-python3 -m night_curator.daily --content-json ~/.night-curator/codex-content/today.json --no-send --summary-json
-```
-
-Remove `--no-send` only after Lark/Feishu delivery is configured.
+- `night-curator-daily` creates a run directory.
+- Python writes a JSON schema for the 9-panel content.
+- `codex exec --output-schema ... --output-last-message ...` writes the content JSON.
+- A second `codex exec` prompt asks Codex to create `comic.png` in the run directory.
+- Python validates the content, writes `data.js` and `index.html`, and optionally sends via Lark/Feishu.
 
 ## Development
 
 ```bash
 python3 -m pip install -e .
-python3 -m unittest discover -v
+python3 -m unittest discover -s tests -v
 ```
 
 ## Security
 
-Do not commit API keys, Lark credentials, generated state, or run output. Keep secrets in environment variables and put only their variable names in `night-curator-config.json`.
+Do not commit generated state, Lark credentials, or run output. Night Curator does not store model API keys; Codex authentication stays managed by the Codex CLI.
 
 ## Files
 
+- `night_curator/codex_runner.py`: Codex CLI prompts and command execution.
 - `night_curator/daily.py`: daily generator/renderer/sender.
 - `night_curator/setup.py`: configuration CLI.
 - `night_curator/schedule.py`: scheduling CLI and launchd plist generation.

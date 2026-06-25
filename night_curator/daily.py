@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
-import argparse, base64, hashlib, json, os, random, subprocess, sys
+import argparse, hashlib, json, os, random, subprocess, sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 try:
-    from .config import default_state_dir, load_config, provider_api_key, provider_header_key
+    from .config import default_state_dir, load_config
+    from .codex_runner import generate_content_with_codex, generate_image_with_codex
 except ImportError:
-    from config import default_state_dir, load_config, provider_api_key, provider_header_key
-try:
-    from openai import OpenAI
-except ImportError:
-    OpenAI = None
+    from config import default_state_dir, load_config
+    from codex_runner import generate_content_with_codex, generate_image_with_codex
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 STATE_DIR = default_state_dir()
@@ -56,10 +54,6 @@ def configured_open_id():
     config = load_project_config()
     return os.environ.get('NIGHT_CURATOR_LARK_OPEN_ID') or config.get('lark', {}).get('open_id') or ''
 
-def provider_headers(provider):
-    header_key = provider_header_key(provider)
-    return {'api-key': header_key} if header_key else None
-
 def run(cmd, cwd=None):
     return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=False)
 
@@ -78,76 +72,12 @@ def choose_museum(run_date=None):
     seed = config.get('agent', {}).get('description') or 'night-curator'
     return day, choose_dynamic_museum(day, seed=seed), now
 
-def llm_json(day, item):
-    if OpenAI is None:
-        raise RuntimeError('The openai package is required for live text generation. Use --dry-run or install openai.')
-    text_config = load_project_config().get('text', {})
-    api_key = provider_api_key(text_config)
-    if not api_key:
-        raise RuntimeError(f"Missing text API key. Set {text_config.get('api_key_env', 'OPENAI_API_KEY')}.")
-    client = OpenAI(api_key=api_key, base_url=text_config.get('base_url'))
-    prompt = f'''
-You are The Night Curator, an educational museum adventure agent.
-Create today's interactive 3x3 museum adventure content in Chinese.
-Day index: {day+1}
-Museum: {item['museum']} ({item['city']}, {item['country']})
-Featured artifact/theme: {item['artifact']}
-Today is a spontaneous one-night museum stop, not part of a prewritten fixed route.
-Do not imply the route was planned long ago. The agent chose this museum tonight because it felt an unusual midnight signal.
-Next museum clue: keep it mysterious and open-ended; do not promise a fixed next museum.
-Return strict JSON only with this shape:
-{{"title":"...","subtitle":"...","panels":[{{"t":"短标题","m":"英文知识标签","story":"120-180 Chinese chars rich adventure plot","note":"150-240 Chinese chars detailed history/archaeology/culture knowledge","q":"indirect higher-order question in Chinese","choices":["A","B","C"],"a":0,"why":"explanation in Chinese"}}]}}
-Need exactly 9 panels. Correct answer index must vary across panels. Questions must require reasoning from the knowledge, not direct lookup. Include real historical/cultural knowledge and avoid hallucinated precise facts when uncertain.
-'''.strip()
-    resp = client.chat.completions.create(
-        model=text_config.get('model'),
-        messages=[{'role':'user','content':prompt}],
-        temperature=0.8,
-        extra_headers=provider_headers(text_config),
-    )
-    text = resp.choices[0].message.content.strip()
-    if text.startswith('```'):
-        text = text[text.find('{'):text.rfind('}')+1]
-    data = json.loads(text)
-    if len(data.get('panels', [])) != 9:
-        raise ValueError('panel count is not 9')
-    return data
-
 def fallback_content(day, item):
     panels=[]
     answers=[1,2,0,1,2,0,2,1,0]
     for i in range(9):
         panels.append({'t':f'第{i+1}格 · {item["artifact"]}','m':item['museum'],'story':f'今晚并没有预设路线。Agent 临时捕捉到来自{item["city"]}的午夜信号，于是抵达{item["museum"]}。第{i+1}个展厅里，{item["artifact"]}的影子开始移动，引导它寻找今晚的月光钥匙线索。','note':f'{item["museum"]}与{item["artifact"]}提供了理解当地历史、考古发现、收藏迁移和文化解释的入口。阅读时要关注地点、年代、材料、原始用途和今天的展示方式。','q':'哪一种阅读方式最接近博物馆学习？','choices':['只看画面是否好看','结合地点、用途、材料和展示语境理解文物','只记住英文名称'], 'a':answers[i], 'why':'正确。博物馆学习需要把文物放回历史和展示语境中。'})
     return {'title':f'The Night Curator · Day {day+1}: {item["museum"]}','subtitle':f'{item["city"]} · {item["artifact"]}', 'panels':panels}
-
-def generate_image(day, item, content, out_dir):
-    if OpenAI is None:
-        raise RuntimeError('The openai package is required for live image generation. Use --dry-run/--no-send or install openai.')
-    config = load_project_config()
-    image_config = config.get('image', {})
-    api_key_env = image_config.get('api_key_env', 'OPENAI_API_KEY')
-    api_key = provider_api_key(image_config)
-    if not api_key:
-        raise RuntimeError(f'Missing image API key. Set {api_key_env}.')
-    base_url = image_config.get('base_url')
-    model = image_config.get('model') or 'gpt-image-2'
-    client = OpenAI(api_key=api_key, base_url=base_url)
-    agent = config.get('agent', {})
-    agent_description = agent.get('description', 'small nimble non-human AI agent explorer with satchel and tiny glowing eyes')
-    anchor_path = ASSETS / agent.get('anchor_image', 'agent-anchor.png')
-    anchor_hint = f' Use the established agent anchor image as identity reference: {anchor_path}.' if anchor_path.exists() else ''
-    prompt = f"""Create one square 3x3 nine-panel comic page for The Night Curator. Museum: {item['museum']} in {item['city']}. Featured artifact/theme: {item['artifact']}. Style: dark cinematic graphic novel, midnight museum adventure, dramatic chiaroscuro, deep navy shadows, antique gold highlights, film grain, inked panel lines. Format: one square image, clear 3 by 3 comic grid, nine distinct panels, thin black gutters. No readable text, no speech bubbles, no logos, no watermark. Recurring character: {agent_description}.{anchor_hint}"""
-    result = client.images.generate(model=model, prompt=prompt, size=image_config.get('size', '1024x1024'), quality=image_config.get('quality', 'medium'), extra_headers=provider_headers(image_config))
-    item0 = result.data[0]
-    out = out_dir / 'comic.png'
-    if getattr(item0, 'b64_json', None):
-        out.write_bytes(base64.b64decode(item0.b64_json))
-    elif getattr(item0, 'url', None):
-        import urllib.request
-        out.write_bytes(urllib.request.urlopen(item0.url, timeout=120).read())
-    else:
-        raise RuntimeError('No image payload')
-    return out
 
 def write_html(content, out_dir, day, item):
     (out_dir / 'data.js').write_text('const panels = ' + json.dumps(content['panels'], ensure_ascii=False, indent=2) + ';\n')
@@ -207,20 +137,21 @@ def load_content_json(path):
     data.setdefault('subtitle', 'Codex-generated museum adventure')
     return data
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description='Run The Night Curator daily adventure.')
     parser.add_argument('--dry-run', action='store_true')
     parser.add_argument('--no-send', action='store_true')
     parser.add_argument('--summary-json', action='store_true')
     parser.add_argument('--date', default='')
     parser.add_argument('--content-json', default='', help='Path to Codex-generated content JSON to render instead of calling a model.')
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_args()
+def main(argv=None):
+    args = parse_args(argv)
     day, item, now = choose_museum(args.date or None)
-    out_dir = RUNS / now.strftime('%Y-%m-%d')
+    state_dir = default_state_dir()
+    out_dir = state_dir / 'runs' / now.strftime('%Y-%m-%d')
     out_dir.mkdir(parents=True, exist_ok=True)
     force_fallback = os.environ.get('NIGHT_CURATOR_FORCE_FALLBACK') == '1'
     content_source = 'codex_json' if args.content_json else ('fallback' if force_fallback or args.dry_run else 'model')
@@ -228,7 +159,7 @@ def main():
         if args.content_json:
             content = load_content_json(args.content_json)
         else:
-            content = fallback_content(day, item) if force_fallback or args.dry_run else llm_json(day, item)
+            content = fallback_content(day, item) if force_fallback or args.dry_run else generate_content_with_codex(item, out_dir, load_project_config())
     except Exception as e:
         if args.content_json:
             raise
@@ -241,8 +172,8 @@ def main():
     if args.dry_run or force_fallback:
         image_path.write_bytes(b'')
     else:
-        image_path = generate_image(day, item, content, out_dir)
-        image_source = 'python_image_api'
+        image_path = generate_image_with_codex(item, content, out_dir, load_project_config())
+        image_source = 'codex_cli'
     html_path = write_html(content, out_dir, day, item)
     sent = False
     if not args.no_send:
@@ -265,6 +196,7 @@ def main():
         print(json.dumps(summary, ensure_ascii=False))
     else:
         print(f"DONE {out_dir}")
+    return 0
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

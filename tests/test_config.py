@@ -4,14 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from night_curator.config import (
-    default_config,
-    default_state_dir,
-    load_config,
-    provider_api_key,
-    provider_header_key,
-    save_config,
-)
+from night_curator.config import default_config, default_state_dir, load_config, save_config
 
 
 class ConfigTests(unittest.TestCase):
@@ -35,47 +28,32 @@ class ConfigTests(unittest.TestCase):
                 else:
                     os.environ["NIGHT_CURATOR_HOME"] = old
 
-    def test_load_config_merges_public_defaults(self):
+    def test_load_config_merges_codex_defaults(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "config.json"
-            path.write_text(json.dumps({"text": {"model": "custom-text"}, "lark": {"enabled": True}}))
+            path.write_text(json.dumps({"codex": {"profile": "night"}, "lark": {"enabled": True}}))
             config = load_config(path)
-            self.assertEqual(config["text"]["model"], "custom-text")
-            self.assertEqual(config["text"]["api_key_env"], "OPENAI_API_KEY")
-            self.assertEqual(config["image"]["model"], "gpt-image-1")
+            self.assertEqual(config["codex"]["bin"], "codex")
+            self.assertEqual(config["codex"]["profile"], "night")
             self.assertTrue(config["lark"]["enabled"])
 
     def test_save_config_does_not_persist_secret_values(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "config.json"
-            save_config(path, {"text": {"api_key_env": "MY_SECRET", "api_key": "sk-secret"}})
+            save_config(path, {"codex": {"bin": "codex"}, "api_key": "sk-secret", "token": "secret-token"})
             raw = path.read_text()
-            self.assertIn("MY_SECRET", raw)
+            self.assertIn("codex", raw)
             self.assertNotIn("sk-secret", raw)
+            self.assertNotIn("secret-token", raw)
 
-    def test_provider_api_key_and_header_key_read_environment(self):
-        old_key = os.environ.get("NC_TEST_KEY")
-        old_header = os.environ.get("NC_TEST_HEADER")
-        os.environ["NC_TEST_KEY"] = "key-value"
-        os.environ["NC_TEST_HEADER"] = "header-value"
-        try:
-            provider = {"api_key_env": "NC_TEST_KEY", "header_key_env": "NC_TEST_HEADER"}
-            self.assertEqual(provider_api_key(provider), "key-value")
-            self.assertEqual(provider_header_key(provider), "header-value")
-        finally:
-            if old_key is None:
-                os.environ.pop("NC_TEST_KEY", None)
-            else:
-                os.environ["NC_TEST_KEY"] = old_key
-            if old_header is None:
-                os.environ.pop("NC_TEST_HEADER", None)
-            else:
-                os.environ["NC_TEST_HEADER"] = old_header
-
-    def test_default_config_has_no_private_urls(self):
-        rendered = json.dumps(default_config())
+    def test_default_config_has_no_model_provider_settings(self):
+        config = default_config()
+        self.assertIn("codex", config)
+        self.assertNotIn("text", config)
+        self.assertNotIn("image", config)
+        rendered = json.dumps(config)
         self.assertNotIn("bytedance", rendered.lower())
-        self.assertEqual(default_config()["text"]["base_url"], "https://api.openai.com/v1")
+        self.assertNotIn("api.openai.com", rendered.lower())
 
 
 if __name__ == "__main__":
